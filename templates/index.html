@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MindMate Mini 🌿</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🌿 MindMate Mini</h1>
+      <p class="subtitle">A small empathetic chatbot for mood check-ins and motivation.</p>
+
+      <div class="breathing-container">
+        <div class="breathing-settings">
+          <select id="breathing-pattern" class="breathing-select">
+            <option value="4-4-4-2">Box Breathing (4-4-4-2)</option>
+            <option value="4-7-8">4-7-8 Relaxing Breath</option>
+            <option value="5-5-5">Simple 5-5-5 Breath</option>
+          </select>
+          <select id="cycles" class="breathing-select">
+            <option value="3">3 Cycles</option>
+            <option value="5">5 Cycles</option>
+            <option value="7">7 Cycles</option>
+          </select>
+          <div class="sound-control">
+            <label>🔈</label>
+            <input type="range" id="volume" min="0" max="100" value="50">
+          </div>
+        </div>
+        
+        <div id="breathing-circle" class="breathing-circle">🌸</div>
+        <div id="breathing-text" class="breathing-text"></div>
+        
+        <div class="breathing-controls">
+          <button id="breathe-button" class="breathing-button">🧘 Start Calm Mode</button>
+          <button id="ambient-toggle" class="breathing-button">🌊 Toggle Ambient</button>
+        </div>
+
+        <!-- Hidden audio elements -->
+        <audio id="chime" preload="auto">
+          <source src="/static/sounds/soft-chime.wav" type="audio/wav">
+        </audio>
+        <audio id="ambient" loop preload="auto">
+          <source src="/static/sounds/ambient-waves.wav" type="audio/wav">
+        </audio>
+        <audio id="background-music" loop preload="auto">
+          <source src="/static/sounds/calm-music.wav" type="audio/wav">
+        </audio>
+      </div>
+
+      <div id="chat" class="chat"></div>
+
+      <form id="chat-form">
+        <input id="message" placeholder="How are you feeling today?" autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+
+      <footer>
+        <small>Powered by your local MindMate Mini — configure GEMINI_API_KEY to use Gemini models.</small>
+      </footer>
+    </div>
+
+    <script>
+      // Breathing exercise functionality
+      const breatheButton = document.getElementById('breathe-button');
+      const ambientToggle = document.getElementById('ambient-toggle');
+      const breathingText = document.getElementById('breathing-text');
+      const breathingCircle = document.getElementById('breathing-circle');
+      const patternSelect = document.getElementById('breathing-pattern');
+      const cyclesSelect = document.getElementById('cycles');
+      const volumeControl = document.getElementById('volume');
+      
+      // Audio elements
+      const chimeSound = document.getElementById('chime');
+      const ambientSound = document.getElementById('ambient');
+      const backgroundMusic = document.getElementById('background-music');
+      
+      // Update volume for all audio
+      volumeControl.addEventListener('input', (e) => {
+        const volume = e.target.value / 100;
+        [chimeSound, ambientSound, backgroundMusic].forEach(audio => {
+          audio.volume = volume;
+        });
+      });
+      
+      // Toggle ambient sounds
+      let isAmbientPlaying = false;
+      ambientToggle.addEventListener('click', async () => {
+        if (isAmbientPlaying) {
+          if (ambientSound) ambientSound.pause();
+          if (backgroundMusic) backgroundMusic.pause();
+          ambientToggle.textContent = '🌊 Toggle Ambient';
+        } else {
+          const playOk = await Promise.all([
+            playSound(ambientSound),
+            playSound(backgroundMusic)
+          ]);
+          if (playOk) ambientToggle.textContent = '🔇 Stop Ambient';
+        }
+        isAmbientPlaying = !isAmbientPlaying;
+      });
+      
+      const patterns = {
+        '4-4-4-2': [
+          { text: "Breathe in... 🫁", duration: 4000, class: 'inhale' },
+          { text: "Hold... 😌", duration: 4000, class: 'hold' },
+          { text: "Breathe out... 🌬", duration: 4000, class: 'exhale' },
+          { text: "Hold... 😌", duration: 2000, class: 'hold' }
+        ],
+        '4-7-8': [
+          { text: "Breathe in... 🫁", duration: 4000, class: 'inhale' },
+          { text: "Hold... 😌", duration: 7000, class: 'hold' },
+          { text: "Breathe out... 🌬", duration: 8000, class: 'exhale' }
+        ],
+        '5-5-5': [
+          { text: "Breathe in... 🫁", duration: 5000, class: 'inhale' },
+          { text: "Hold... 😌", duration: 5000, class: 'hold' },
+          { text: "Breathe out... 🌬", duration: 5000, class: 'exhale' }
+        ]
+      };
+      
+      // Helper function to safely play audio
+      async function playSound(audioElement) {
+        try {
+          if (audioElement && audioElement.readyState === 4) { // HAVE_ENOUGH_DATA
+            await audioElement.play();
+          }
+        } catch (e) {
+          console.log('Audio playback failed:', e);
+        }
+      }
+
+      async function runBreathingExercise() {
+        breatheButton.disabled = true;
+        document.body.classList.add('breathing-active');
+        
+        const selectedPattern = patterns[patternSelect.value];
+        const cycles = parseInt(cyclesSelect.value);
+        
+        await playSound(chimeSound); // Initial chime
+        
+        for (let i = 0; i < cycles; i++) {
+          for (const step of selectedPattern) {
+            breathingText.textContent = step.text;
+            breathingCircle.className = `breathing-circle ${step.class}`;
+            document.body.className = `breathing-${step.class}`;
+            
+            breathingText.style.animation = 'none';
+            breathingText.offsetHeight; // Trigger reflow
+            breathingText.style.animation = null;
+            
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+          }
+          
+          if (i < cycles - 1) {
+            if (chimeSound) {
+              chimeSound.currentTime = 0;
+              await playSound(chimeSound);
+            }
+          }
+        }
+        
+        // Reset and completion
+        breathingText.textContent = "Well done! 🌟";
+        breathingCircle.className = 'breathing-circle';
+        document.body.className = '';
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        breathingText.textContent = "";
+        breatheButton.disabled = false;
+        document.body.classList.remove('breathing-active');
+      }
+      
+      breatheButton.addEventListener('click', runBreathingExercise);
+
+      // Chat functionality
+      const chatEl = document.getElementById('chat');
+      const form = document.getElementById('chat-form');
+      const input = document.getElementById('message');
+
+      function addMessage(who, text, mood) {
+        const div = document.createElement('div');
+        div.className = 'message ' + who;
+        let html = `<div class="bubble"><strong>${who === 'user' ? 'You' : 'MindMate Mini'}</strong>`;
+        if (mood && who === 'assistant') html += `<div class="mood">Mood: ${mood}</div>`;
+        html += `<div class="text">${text}</div></div>`;
+        div.innerHTML = html;
+        chatEl.appendChild(div);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      async function sendMessage(text) {
+        addMessage('user', text);
+        try {
+          const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: text})
+          });
+          const j = await resp.json();
+          if (resp.ok) {
+            addMessage('assistant', j.reply, j.mood);
+          } else {
+            addMessage('assistant', j.error || 'Something went wrong.');
+          }
+        } catch (err) {
+          addMessage('assistant', 'Network error: ' + err.message);
+        }
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        sendMessage(text);
+      });
+
+      // starter message
+      addMessage('assistant', 'Hi — I\'m MindMate Mini. How are you feeling today?');
+    </script>
+  </body>
+</html>
